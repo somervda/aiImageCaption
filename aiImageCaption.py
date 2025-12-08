@@ -10,13 +10,13 @@ load_dotenv(dotenv_path=".env", override=True)
 llm = ChatOllama(
     model="llama3.2-vision:11b",
     base_url="http://mac:11434",
-    temperature=0.1,
+    temperature=0.0,
 )
 
 
 
 @traceable
-def caption(path:str):
+def getImageCaption(path:str):
     # Read and encode image
     print("Start encoding..")
     with open(image_path, "rb") as image_file:
@@ -26,7 +26,7 @@ def caption(path:str):
     print("Making Message..")
     message = HumanMessage(
         content=[
-            {"type": "text", "text": "Write a caption for this image,use 10 words or less"},
+            {"type": "text", "text": "Create a short 10 word caption for this image."},
             {
                 "type": "image_url",
                 "image_url": f"data:image/jpeg;base64,{encoded_image}"
@@ -37,9 +37,9 @@ def caption(path:str):
     # Invoke model
     print("Invoke message..")
     response = llm.invoke([message])
-    print(f"Response: {response.content}")
+    return(response.content)
 
 if __name__ == "__main__":
     # Path to your local image
-    image_path = "C:/Users/grace/OneDrive/Pictures/Korea/IMG_4782.jpg"
-    caption(image_path)
+    image_path = "C:/Users/grace/OneDrive/Pictures/Korea/IMG_5482.jpeg"
+    print(f"\nResponse: {getImageCaption(image_path)}")
