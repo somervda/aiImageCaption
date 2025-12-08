@@ -10,6 +10,7 @@ load_dotenv(dotenv_path=".env", override=True)
 llm = ChatOllama(
     model="llama3.2-vision:11b",
     base_url="http://mac:11434",
+    num_ctx=2048,
     temperature=0.0,
 )
 
