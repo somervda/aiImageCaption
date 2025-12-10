@@ -39,10 +39,10 @@ parser = argparse.ArgumentParser(
                     "of the images. heic files will be converted to jpg files")
 parser.add_argument("source",type=dir_path, help="Source directory containing images and subdirectories to be captioned")
 parser.add_argument("destination", type=dir_path, help="Destination directory , where updated files are placed")
-parser.add_argument('-m', '--model', nargs='?',  default="llama3.2-vision:11b", type=str,
-                    help='Optional Ollama hosted vision model. Defaults to llama3.2-vision:11b if not specified')
-parser.add_argument('-u', '--url', nargs='?',  default="http://mac:11434", type=str,
-                    help='Optional base URL for Ollama. Defaults to http://mac:11434 if not specified')
+parser.add_argument('-m', '--model', nargs='?',  default="granite3.2-vision:2b", type=str,
+                    help='Optional Ollama hosted vision model. Defaults to granite3.2-vision:2b if not specified')
+parser.add_argument('-u', '--url', nargs='?',  default="http://192.168.1.117:11434", type=str,
+                    help='Optional base URL for Ollama. Defaults to http://192.168.1.117:11434 if not specified')
 
 register_heif_opener()
 
@@ -52,13 +52,35 @@ register_heif_opener()
 def convert_heic_to_jpeg(heic_path, jpeg_path):
     try:
         with Image.open(heic_path) as img:
-            # Convert to RGB mode, as JPEG typically uses RGB
-            img.convert('RGB').save(jpeg_path, 'JPEG')
-        print(f"Successfully converted '{heic_path}' to '{jpeg_path}'")
+            # Extract EXIF data (if present)
+            exif_data = img.info.get('exif')
+
+            # Convert to RGB mode if not already (important for saving as JPG)
+            rgb_image = img.convert("RGB")
+
+            # Save the image as JPG, including the extracted EXIF data
+            if exif_data:
+                rgb_image.save(jpeg_path, format="jpeg", exif=exif_data)
+            else:
+                rgb_image.save(jpeg_path, format="jpeg")
     except Exception as e:
         print(f"Error converting '{heic_path}': {e}")
 
-def process_files(source_folder, destination_folder,model,base_url):
+def keywords_to_filename(file_path:str,keywords:list[str]):
+    # Create a new file name based on image keywords and the original file name
+    # Extracting the full filename
+    filename = os.path.basename(file_path)
+    # print(f"Filename: {filename}")  # Output: report.pdf
+    # Extracting the directory name
+    dirname = os.path.dirname(file_path)
+    # print(f"Directory: {dirname}")  # Output: /home/user/documents
+    # Extracting the filename without extension and the extension
+    root, ext = os.path.splitext(filename)
+
+    # Rebuild the file name by <directory name>/<keywords separated by underscores>_<original file name>
+    
+
+def process_files(source_folder, destination_folder):
     """
     Iterates through files in a named folder and its subfolders,
     and copies them to a new destination folder.
@@ -72,8 +94,13 @@ def process_files(source_folder, destination_folder,model,base_url):
         return
 
     # Create the destination folder if it doesn't exist
+    files_count_total=0
+    for root, _, files in os.walk(source_folder):
+        # Walks through folder (root) contained in the source directory
+        for file_name in files:
+            files_count_total+=1
 
-
+    file_count=0
     for root, _, files in os.walk(source_folder):
 
         # Walks through folder (root) contained in the source directory
@@ -88,9 +115,10 @@ def process_files(source_folder, destination_folder,model,base_url):
         else:
                 os.makedirs(destination_folder_path, exist_ok=False)
         for file_name in files:
+            file_count+=1
+            print("\nFile:",file_count,"/" , files_count_total)
             source_file_path = os.path.join(root, file_name)
             destination_file_path = os.path.join(destination_folder_path, file_name)
-            # print(f"fileloop source_file_path:'{source_file_path}' destination_file_path:'{destination_file_path}' root:'{root} ")
             try:
                 # For heic files
                 # Use pillow_heif to make a jpg version of any heif file as temp.jpg
@@ -101,11 +129,11 @@ def process_files(source_folder, destination_folder,model,base_url):
                 fileroot, extension = os.path.splitext(source_file_path)
                 print(f"extension:'{extension}'")
                 if extension.lower()==".heic":
-                    convert_heic_to_jpeg(source_file_path,"./temp.jpg")
+                    convert_heic_to_jpeg(source_file_path,"temp.jpg")
                     # new_file_Path = os.path.join(destination_folder_path, file_name)
                     jpg_file_path=destination_file_path.replace(extension,".jpg")
-                    shutil.copy2("./temp.jpg", jpg_file_path)
-                    print(f"Copied: ./temp.jpg to '{jpg_file_path}'")
+                    shutil.copy2("temp.jpg", jpg_file_path)
+                    print(f"Copied: temp.jpg to '{jpg_file_path}'")
                     destination_file_path=jpg_file_path
                 else:
                     if extension.lower() in [".jpg", ".png"]:
@@ -115,19 +143,19 @@ def process_files(source_folder, destination_folder,model,base_url):
                 print(f"Error copying '{source_file_path}': {e}")
             except Exception as e:
                 print(f"An unexpected error occurred while copying '{source_file_path}': {e}")
-            keywords=getImageCaption(destination_file_path,model,base_url)
-            print(keywords,"/n")
+            if extension.lower() in [".jpg", ".png",".heic"]:
+                keywords=getImageKeywords(destination_file_path)
+                print(keywords)
+
+
 
 
 @traceable
-def getImageCaption(image_path:str,model:str,base_url:str):
+def getImageKeywords(image_path:str):
+    # Ollama model seems to need a rest between invocations
+    # Maybe to clean things up?
     time.sleep(1)
-        # Set up the model, using the chatOllama provider package
-    llm = ChatOllama(
-        model=model,
-        base_url=base_url,
-        temperature=0.0,
-)
+
     # Read and encode image
 
     with open(image_path, "rb") as image_file:
@@ -136,7 +164,7 @@ def getImageCaption(image_path:str,model:str,base_url:str):
     # Create message with base64 image
     message = HumanMessage(
         content=[
-            {"type": "text", "text": "Describe the image with a collection of up to 10 keywords. "},
+            {"type": "text", "text": "Get a list of the top 4 keywords that describe on the image. "},
             {
                 "type": "image_url",
                 "image_url": f"data:image/jpeg;base64,{encoded_image}"
@@ -150,19 +178,24 @@ def getImageCaption(image_path:str,model:str,base_url:str):
     response = structured_llm.invoke([message])
     # Remove duplicates from the list
     unique_list = list(set(response.keywords))
-    return(unique_list)
+    # Remove special characters from list
+    clean_unique_list=[]
+    for keyword in unique_list:
+        # This pattern matches any character that is NOT a letter, number, or space
+        clean_keyword = re.sub(r'[^a-zA-Z0-9\s]', '', keyword).replace(" ","-")
+        clean_unique_list.append(clean_keyword)
+    return(clean_unique_list)
 
-# if __name__ == "__main__":
-#     # Path to your local image
-#     image_path = "C:/Users/grace/OneDrive/Pictures/Korea/IMG_5482.jpeg"
-#     print(f"\nResponse: {getImageCaption(image_path)}")
-
-
-# Example usage:
 if __name__ == "__main__":
     args = parser.parse_args()
     source_directory = args.source
     destination_directory = args.destination
     print(source_directory,destination_directory)
+    # Set up the model, using the chatOllama provider package
+    llm = ChatOllama(
+        model=args.model,
+        base_url=args.url,
+        temperature=0.0
+        )
 
-    process_files(source_directory, destination_directory,args.model,args.url)
+    process_files(source_directory, destination_directory)
