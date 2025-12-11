@@ -12,13 +12,16 @@ import argparse
 import re
 import time
 
-DEBUG_MODE=False
 start_time=time.time()
 
+DEBUG_MODE=False
 def debug_print(*args, **kwargs):
     if DEBUG_MODE:
         print(*args, **kwargs)
 
+register_heif_opener()
+
+# Define a datatype to be used to formate the LLM output
 class File_Keywords(BaseModel):
         keywords: list[str]  # A list of strings
 
@@ -39,6 +42,7 @@ def dir_path(file_path):
     else:
         raise argparse.ArgumentError('Not a path')
 
+# Setup arg parser (Defaults to the granite3.2-vision:2b model on my development PC)
 parser = argparse.ArgumentParser(
                     prog='aiImageCaption',
                     description="Create a copy of image files based on scanning a directory. " +
@@ -51,20 +55,14 @@ parser.add_argument('-m', '--model', nargs='?',  default="granite3.2-vision:2b",
 parser.add_argument('-u', '--url', nargs='?',  default="http://192.168.1.117:11434", type=str,
                     help='Optional base URL for Ollama. Defaults to http://192.168.1.117:11434 if not specified')
 
-register_heif_opener()
-
-
-
 
 def convert_heic_to_jpeg(heic_path, jpeg_path):
     try:
         with Image.open(heic_path) as img:
             # Extract EXIF data (if present)
             exif_data = img.info.get('exif')
-
             # Convert to RGB mode if not already (important for saving as JPG)
             rgb_image = img.convert("RGB")
-
             # Save the image as JPG, including the extracted EXIF data
             if exif_data:
                 rgb_image.save(jpeg_path, format="jpeg", exif=exif_data)
@@ -88,10 +86,6 @@ def keywords_to_filename(file_path:str,keywords:list[str]):
     new_file_name += filename
     debug_print(new_file_name)
     return os.path.join(dirname, new_file_name)
-
-    
-    
-    
 
 def process_files(source_folder, destination_folder):
     """
@@ -139,26 +133,23 @@ def process_files(source_folder, destination_folder):
             source_file_path = os.path.join(root, file_name)
             destination_file_path = os.path.join(destination_folder_path, file_name)
             try:
-                # For heic files
-                # Use pillow_heif to make a jpg version of any heif file as temp.jpg
-                # then use caption utility to make a new file name
-                # then copy the file to the new directory with the new file name
-                # for all other image files (only jpg and png supported)
-                # just work out a new file name and copy to the new directory
                 fileroot, extension = os.path.splitext(source_file_path)
                 debug_print(f"extension:'{extension}'")
                 if extension.lower()==".heic":
+                    # For heic files
+                    # Use pillow_heif to make a jpg version of any heif file as temp.jpg
                     convert_heic_to_jpeg(source_file_path,"temp.jpg")
                     # new_file_Path = os.path.join(destination_folder_path, file_name)
                     jpg_file_path=destination_file_path.replace(extension,".jpg")
                     shutil.copy2("temp.jpg", jpg_file_path)
                     print(f"Copied: temp.jpg to '{jpg_file_path}'")
                     destination_file_path=jpg_file_path
-                elif extension.lower() in [".jpg", ".png",".mp4"]:
+                elif extension.lower() in [".jpg", ".png",".mp4",".jpeg",".webp",".gif",".bmp",".tif",".tiff"]:
+                    # All other supported files other than mov, just copy
                     shutil.copy2(source_file_path, destination_file_path)
                     print(f"Copied: '{source_file_path}' to '{destination_file_path}'")
                 elif extension.lower() in [".mov"]: 
-                    # Only copy mov files if not sources from a heic file
+                    # Only copy mov files if not sourced from a heic file snapshot
                     mov_fileroot, mov_extension = os.path.splitext(destination_file_path)
                     if not (os.path.basename(mov_fileroot) in heic_files):
                         shutil.copy2(source_file_path, destination_file_path)
@@ -167,7 +158,8 @@ def process_files(source_folder, destination_folder):
                 print(f"Error copying '{source_file_path}': {e}")
             except Exception as e:
                 print(f"An unexpected error occurred while copying '{source_file_path}': {e}")
-            if extension.lower() in [".jpg", ".png",".heic"]:
+            if extension.lower() in [".jpg", ".png",".heic",".jpg", ".png",".jpeg",".webp",".gif",".bmp",".tif",".tiff"]:
+                # Still image files, try generating a better file name
                 keywords=getImageKeywords(destination_file_path)
                 new_file_name=keywords_to_filename(destination_file_path,keywords)
                 try:
@@ -199,7 +191,8 @@ def getImageKeywords(image_path:str):
         ]
     )
 
-    # Invoke model
+    # Use the structured output option on the llm to force output to follow the File_Keywords data type 
+    # specified earlier using pydantic 
     structured_llm = llm.with_structured_output(File_Keywords, method="json_schema")
     response = structured_llm.invoke([message])
     # Remove duplicates from the list
