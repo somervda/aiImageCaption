@@ -12,6 +12,13 @@ import argparse
 import re
 import time
 
+DEBUG_MODE=False
+start_time=time.time()
+
+def debug_print(*args, **kwargs):
+    if DEBUG_MODE:
+        print(*args, **kwargs)
+
 class File_Keywords(BaseModel):
         keywords: list[str]  # A list of strings
 
@@ -70,20 +77,16 @@ def keywords_to_filename(file_path:str,keywords:list[str]):
     # Create a new file name based on image keywords and the original file name
     # Extracting the full filename
     filename = os.path.basename(file_path)
-    # print(f"Filename: {filename}")  # Output: report.pdf
     # Extracting the directory name
     dirname = os.path.dirname(file_path)
-    # print(f"Directory: {dirname}")  # Output: /home/user/documents
     # Extracting the filename without extension and the extension
     root, ext = os.path.splitext(filename)
-
     # Rebuild the file name by <directory name>/<keywords separated by underscores>_<original file name>
-
     new_file_name=""
     for  keyword in keywords:
         new_file_name+= keyword +"_"
     new_file_name += filename
-    print(new_file_name)
+    debug_print(new_file_name)
     return os.path.join(dirname, new_file_name)
 
     
@@ -112,21 +115,27 @@ def process_files(source_folder, destination_folder):
 
     file_count=0
     for root, _, files in os.walk(source_folder):
-
         # Walks through folder (root) contained in the source directory
         relative_path = os.path.relpath(root, source_folder)
         destination_folder_path =os.path.join(destination_folder, relative_path)
-        print("")
-        # print(f"walker root:'{root}' relative_path:'{relative_path}' destination_folder_path:'{destination_folder_path}'")
+        debug_print(f"walker root:'{root}' relative_path:'{relative_path}' destination_folder_path:'{destination_folder_path}'")
         # First make sure the destination folder doesn't already exist 
         if  os.path.exists(destination_folder_path):
             print(f"Error: Destination folder '{destination_folder_path}' already exists.")
             return
         else:
                 os.makedirs(destination_folder_path, exist_ok=False)
+        # Get a list of heic files in the folder, use this to decide which MOV files not to copy
+        #  I don't want to copy the ones that match heic file names 
+        heic_files=[]
+        for file_name in files:
+            fileroot, extension = os.path.splitext(file_name)
+            if extension.lower()==".heic":
+                heic_files.append(os.path.basename(fileroot))
+        debug_print(heic_files)
         for file_name in files:
             file_count+=1
-            print("\nFile:",file_count,"/" , files_count_total)
+            print("\nFile:",file_count,"/" , files_count_total, "  ",round(time.time() - start_time,1))
             source_file_path = os.path.join(root, file_name)
             destination_file_path = os.path.join(destination_folder_path, file_name)
             try:
@@ -137,7 +146,7 @@ def process_files(source_folder, destination_folder):
                 # for all other image files (only jpg and png supported)
                 # just work out a new file name and copy to the new directory
                 fileroot, extension = os.path.splitext(source_file_path)
-                print(f"extension:'{extension}'")
+                debug_print(f"extension:'{extension}'")
                 if extension.lower()==".heic":
                     convert_heic_to_jpeg(source_file_path,"temp.jpg")
                     # new_file_Path = os.path.join(destination_folder_path, file_name)
@@ -145,8 +154,13 @@ def process_files(source_folder, destination_folder):
                     shutil.copy2("temp.jpg", jpg_file_path)
                     print(f"Copied: temp.jpg to '{jpg_file_path}'")
                     destination_file_path=jpg_file_path
-                else:
-                    if extension.lower() in [".jpg", ".png"]:
+                elif extension.lower() in [".jpg", ".png",".mp4"]:
+                    shutil.copy2(source_file_path, destination_file_path)
+                    print(f"Copied: '{source_file_path}' to '{destination_file_path}'")
+                elif extension.lower() in [".mov"]: 
+                    # Only copy mov files if not sources from a heic file
+                    mov_fileroot, mov_extension = os.path.splitext(destination_file_path)
+                    if not (os.path.basename(mov_fileroot) in heic_files):
                         shutil.copy2(source_file_path, destination_file_path)
                         print(f"Copied: '{source_file_path}' to '{destination_file_path}'")
             except IOError as e:
@@ -171,15 +185,9 @@ def process_files(source_folder, destination_folder):
 
 @traceable
 def getImageKeywords(image_path:str):
-    # Ollama model seems to need a rest between invocations
-    # Maybe to clean things up?
-    time.sleep(1)
-
     # Read and encode image
-
     with open(image_path, "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
-
     # Create message with base64 image
     message = HumanMessage(
         content=[
@@ -193,7 +201,6 @@ def getImageKeywords(image_path:str):
 
     # Invoke model
     structured_llm = llm.with_structured_output(File_Keywords, method="json_schema")
-    print("Analyze Image...")
     response = structured_llm.invoke([message])
     # Remove duplicates from the list
     unique_list = list(set(response.keywords))
