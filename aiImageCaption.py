@@ -78,6 +78,16 @@ def keywords_to_filename(file_path:str,keywords:list[str]):
     root, ext = os.path.splitext(filename)
 
     # Rebuild the file name by <directory name>/<keywords separated by underscores>_<original file name>
+
+    new_file_name=""
+    for  keyword in keywords:
+        new_file_name+= keyword +"_"
+    new_file_name += filename
+    print(new_file_name)
+    return os.path.join(dirname, new_file_name)
+
+    
+    
     
 
 def process_files(source_folder, destination_folder):
@@ -145,7 +155,16 @@ def process_files(source_folder, destination_folder):
                 print(f"An unexpected error occurred while copying '{source_file_path}': {e}")
             if extension.lower() in [".jpg", ".png",".heic"]:
                 keywords=getImageKeywords(destination_file_path)
-                print(keywords)
+                new_file_name=keywords_to_filename(destination_file_path,keywords)
+                try:
+                    # Rename the file
+                    os.rename(destination_file_path, new_file_name)
+                    print(f"File '{destination_file_path}' successfully renamed to '{new_file_name}'.")
+                except FileNotFoundError:
+                    print(f"Error: The file '{destination_file_path}' was not found.")
+                except OSError as e:
+                    print(f"Error renaming file: {e}")
+                
 
 
 
