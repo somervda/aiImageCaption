@@ -1,7 +1,7 @@
 [project]
 name = "aiimagecaption"
 version = "0.1.0"
-description = "Add your description here"
+description = "Image file AI file captioning utility"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

@@ -144,7 +144,7 @@ def process_files(source_folder, destination_folder):
                     shutil.copy2("temp.jpg", jpg_file_path)
                     print(f"Copied: temp.jpg to '{jpg_file_path}'")
                     destination_file_path=jpg_file_path
-                elif extension.lower() in [".jpg", ".png",".mp4",".jpeg",".webp",".gif",".bmp",".tif",".tiff"]:
+                elif extension.lower() in [".jpg", ".png",".mp4",".jpeg",".gif",".bmp",".tif",".tiff"]:
                     # All other supported files other than mov, just copy
                     shutil.copy2(source_file_path, destination_file_path)
                     print(f"Copied: '{source_file_path}' to '{destination_file_path}'")
@@ -158,7 +158,7 @@ def process_files(source_folder, destination_folder):
                 print(f"Error copying '{source_file_path}': {e}")
             except Exception as e:
                 print(f"An unexpected error occurred while copying '{source_file_path}': {e}")
-            if extension.lower() in [".jpg", ".png",".heic",".jpg", ".png",".jpeg",".webp",".gif",".bmp",".tif",".tiff"]:
+            if extension.lower() in [".jpg", ".png",".heic",".jpg", ".png",".jpeg",".gif",".bmp",".tif",".tiff"]:
                 # Still image files, try generating a better file name
                 keywords=getImageKeywords(destination_file_path)
                 new_file_name=keywords_to_filename(destination_file_path,keywords)
