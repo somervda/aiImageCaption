@@ -7,8 +7,7 @@ register_heif_opener()
 def convert_heic_to_jpeg(heic_path, jpeg_path):
     try:
         with Image.open(heic_path) as img:
-            # Convert to RGB mode, as JPEG typically uses RGB
-            img.convert('RGB').save(jpeg_path, 'JPEG')
+            img.save(jpeg_path, 'JPEG')
         print(f"Successfully converted '{heic_path}' to '{jpeg_path}'")
     except Exception as e:
         print(f"Error converting '{heic_path}': {e}")

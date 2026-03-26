@@ -183,7 +183,7 @@ def getImageKeywords(image_path:str):
     # Create message with base64 image
     message = HumanMessage(
         content=[
-            {"type": "text", "text": "Get a list of the top 4 keywords that describe on the image. "},
+            {"type": "text", "text": "Get a list of the top 4 keywords that describe the image. "},
             {
                 "type": "image_url",
                 "image_url": f"data:image/jpeg;base64,{encoded_image}"
@@ -194,9 +194,13 @@ def getImageKeywords(image_path:str):
     # Use the structured output option on the llm to force output to follow the File_Keywords data type 
     # specified earlier using pydantic 
     structured_llm = llm.with_structured_output(File_Keywords, method="json_schema")
-    response = structured_llm.invoke([message])
-    # Remove duplicates from the list
-    unique_list = list(set(response.keywords))
+    try:
+        response = structured_llm.invoke([message])
+        # Remove duplicates from the list
+        unique_list = list(set(response.keywords))
+    except Exception as e:
+        print(f"Error invoking LLM: {e}")
+        unique_list=[]
     # Remove special characters from list
     clean_unique_list=[]
     for keyword in unique_list:

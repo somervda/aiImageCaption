@@ -16,3 +16,6 @@ Use the following packages added via uv
 - uv add python-dotenv
 
 I use the [llama3.2-vision:11b](https://ollama.com/library/llama3.2-vision:11b) LLM for working with the image content and generation the file names.
+
+Used pyinstaller to make a windows executable
+- pyinstaller aiImageCaption.py --onefile
