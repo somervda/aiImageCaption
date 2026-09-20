@@ -83,6 +83,8 @@ def keywords_to_filename(file_path:str,keywords:list[str]):
     new_file_name=""
     for  keyword in keywords:
         new_file_name+= keyword +"_"
+        if len(new_file_name)>80:
+            break
     new_file_name += filename
     debug_print(new_file_name)
     return os.path.join(dirname, new_file_name)
@@ -169,7 +171,9 @@ def process_files(source_folder, destination_folder):
                 except FileNotFoundError:
                     print(f"Error: The file '{destination_file_path}' was not found.")
                 except OSError as e:
-                    print(f"Error renaming file: {e}")
+                    print(f"OSError renaming file: {e}")
+                except  e:
+                    print(f"Error renaming file: {e} : '{new_file_name}'")
                 
 
 
@@ -183,7 +187,7 @@ def getImageKeywords(image_path:str):
     # Create message with base64 image
     message = HumanMessage(
         content=[
-            {"type": "text", "text": "Get a list of the top 4 keywords that describe the image. "},
+            {"type": "text", "text": "Get a list of the top 4 keywords that describe the image. The keywords must be single words "},
             {
                 "type": "image_url",
                 "image_url": f"data:image/jpeg;base64,{encoded_image}"
