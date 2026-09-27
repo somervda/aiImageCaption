@@ -50,11 +50,12 @@ parser = argparse.ArgumentParser(
                     "of the images. heic files will be converted to jpg files")
 parser.add_argument("source",type=dir_path, help="Source directory containing images and subdirectories to be captioned")
 parser.add_argument("destination", type=dir_path, help="Destination directory , where updated files are placed")
-parser.add_argument('-m', '--model', nargs='?',  default="granite3.2-vision:2b", type=str,
-                    help='Optional Ollama hosted vision model. Defaults to granite3.2-vision:2b if not specified')
+parser.add_argument('-m', '--model', nargs='?',  default="qwen2.5vl", type=str,
+                    help='Optional Ollama hosted vision model. Defaults to qwen2.5vl if not specified')
 parser.add_argument('-u', '--url', nargs='?',  default="http://192.168.1.117:11434", type=str,
                     help='Optional base URL for Ollama. Defaults to http://192.168.1.117:11434 if not specified')
-
+parser.add_argument('-c', '--ctx', nargs='?',  default="16384", type=int,
+                    help='Optional number-ctx value to set context window size. Defaults to 16384 if not specified')
 
 def convert_heic_to_jpeg(heic_path, jpeg_path):
     try:
@@ -187,7 +188,7 @@ def getImageKeywords(image_path:str):
     # Create message with base64 image
     message = HumanMessage(
         content=[
-            {"type": "text", "text": "Get a list of the top 4 keywords that describe the image. The keywords must be single words "},
+            {"type": "text", "text": "Identify the three most prominent or visually dominant objects in this image. Return your answer only as a list containing exactly three items. Do not include any introductory or concluding text."},
             {
                 "type": "image_url",
                 "image_url": f"data:image/jpeg;base64,{encoded_image}"
@@ -202,6 +203,7 @@ def getImageKeywords(image_path:str):
         response = structured_llm.invoke([message])
         # Remove duplicates from the list
         unique_list = list(set(response.keywords))
+        print(unique_list)
     except Exception as e:
         print(f"Error invoking LLM: {e}")
         unique_list=[]
@@ -222,7 +224,8 @@ if __name__ == "__main__":
     llm = ChatOllama(
         model=args.model,
         base_url=args.url,
-        temperature=0.0
+        temperature=0.0,
+        num_ctx=args.ctx
         )
 
     process_files(source_directory, destination_directory)
